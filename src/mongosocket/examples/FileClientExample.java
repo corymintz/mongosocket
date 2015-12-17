@@ -2,15 +2,14 @@ package mongosocket.examples;
 
 import com.mongodb.MongoClient;
 import com.mongodb.MongoNamespace;
-import mongosocket.MongoSocket;
 import mongosocket.MongoSocketClient;
 import mongosocket.MongoSocketConnectFailedException;
+import mongosocket.file.MongoFileInputStream;
 
 import java.io.IOException;
-import java.io.OutputStream;
 
-public class SimpleClientExample {
-
+public class FileClientExample
+{
     public static void main(String[] args) throws MongoSocketConnectFailedException, IOException {
         java.util.logging.LogManager.getLogManager().reset();
 
@@ -19,17 +18,16 @@ public class SimpleClientExample {
                 new MongoNamespace("test.test")
         );
 
-        for(int i = 0; i < 25; i++) {
-            Runnable task = () -> {
-                try {
-                    MongoSocket s = client.connect(600);
-                    OutputStream stream = s.getOutputStream();
-                    stream.write("Hello, World.".getBytes());
-                    stream.close();
-                } catch (Exception e) {}
-            };
+        MongoFileInputStream s = new MongoFileInputStream(client, args[0]);
 
-            new Thread(task).start();
+        byte[] buffer = new byte[1024];
+        while (true) {
+            int read = s.read(buffer);
+            if (read == 0) {
+                break;
+            }
+
+            System.out.println(new String(buffer, 0, read));
         }
     }
 }
