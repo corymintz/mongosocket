@@ -24,8 +24,9 @@ public class MongoSocketClient {
         long serverSequenceNum = 0;
         MongoCollection<Document> sendCollection = null;
         MongoCollection<Document> sendControlCollection = null;
-        MongoCollection<Document> receiveCollection = null;
+        MongoNamespace receiveNamespace = null;
         MongoCollection<Document> receiveControlCollection = null;
+        MongoCursor<Document> serverHelloCursor = MongoSocketUtils.createTailingCursor(_serverConnectCollection);
 
         // send hello on server namespace where hopefully a server is listening
         String clientId = MongoSocketUtils.newClientId();
@@ -40,12 +41,11 @@ public class MongoSocketClient {
 
         // wait for the server to response to the clientId
         long timeout = System.currentTimeMillis() + (pConnectTimeout * 1000L);
-        MongoCursor<Document> serverHelloCursor = MongoSocketUtils.createTailingCursor(_serverConnectCollection);
         try {
             while (System.currentTimeMillis() < timeout) {
                 Document d = MongoSocketUtils.getDocFromTailingCursor(
                     serverHelloCursor,
-                    System.currentTimeMillis() - timeout);
+                    timeout - System.currentTimeMillis());
                 if (d == null) {
                     throw new MongoSocketConnectFailedException("Timeout waiting for connection");
                 }
@@ -78,14 +78,12 @@ public class MongoSocketClient {
                         .getDatabase(sendControl.getDatabaseName())
                         .getCollection(sendControl.getCollectionName());
 
-                MongoNamespace receiveNamespace = new MongoNamespace(payload.getString("receiveNamespace"));
-                receiveCollection = _client
-                        .getDatabase(receiveNamespace.getDatabaseName())
-                        .getCollection(receiveNamespace.getCollectionName());
+                receiveNamespace = new MongoNamespace(payload.getString("receiveNamespace"));
                 MongoNamespace receiveControl = new MongoNamespace(payload.getString("receiveControl"));
                 receiveControlCollection = _client
                         .getDatabase(receiveControl.getDatabaseName())
                         .getCollection(receiveControl.getCollectionName());
+                break;
             }
         } finally {
             serverHelloCursor.close();
@@ -97,7 +95,7 @@ public class MongoSocketClient {
         }
 
         // start listening on the receive namespace
-        MongoCursor<Document> receiveCursor = MongoSocketUtils.createTailingCursor(receiveCollection);
+        MongoCursor<Document> receiveCursor = MongoSocketUtils.createTailingCursorAndCollection(_client, receiveNamespace, 1024 * 1024);
 
         // send a ping on the send namespace
         try {
@@ -109,32 +107,30 @@ public class MongoSocketClient {
             throw new MongoSocketConnectFailedException("Failed to send `Ping` to MongoDB server", e);
         }
 
-        // wait for a pong on the receive namespace
-        while (System.currentTimeMillis() < timeout) {
-            Document d = MongoSocketUtils.getDocFromTailingCursor(
-                receiveCursor,
-                System.currentTimeMillis() - timeout);
-            if (d == null) {
-                throw new MongoSocketConnectFailedException("Timeout waiting for connection");
-            }
-
-            if (d.containsKey("type") == false || d.getString("type").equals(MessageType.ServerPong.name()) == false) {
-                throw new MongoSocketConnectFailedException(
-                        "Failed to handshake to server, did not receive expected `Pong`");
-            }
-
-            Document payload = (Document) d.get("payload");
-            if (payload.containsKey("clientId") == false || payload.getString("clientId").equals(clientId) == false) {
-                throw new MongoSocketConnectFailedException(
-                        "Failed to handshake to server, did not receive `clientId`");
-            }
-
-            if (d.containsKey("seqNum") == false || d.getLong("seqNum") != serverSequenceNum) {
-                throw new MongoSocketConnectFailedException(
-                        "Failed to handshake to server, did not receive expected sequence number");
-            }
-            serverSequenceNum++;
+        Document d = MongoSocketUtils.getDocFromTailingCursor(
+            receiveCursor,
+            timeout - System.currentTimeMillis());
+        if (d == null) {
+            throw new MongoSocketConnectFailedException("Timeout waiting for connection");
         }
+
+        if (d.containsKey("type") == false || d.getString("type").equals(MessageType.ServerPong.name()) == false) {
+            throw new MongoSocketConnectFailedException(
+                "Failed to handshake to server, did not receive expected `Pong`");
+        }
+
+        Document payload = (Document) d.get("payload");
+        if (payload.containsKey("clientId") == false || payload.getString("clientId").equals(clientId) == false) {
+            throw new MongoSocketConnectFailedException(
+                "Failed to handshake to server, did not receive `clientId`");
+        }
+
+        if (d.containsKey("seqNum") == false || d.getLong("seqNum") != serverSequenceNum) {
+            throw new MongoSocketConnectFailedException(
+                "Failed to handshake to server, did not receive expected sequence number");
+        }
+        serverSequenceNum++;
+
 
         return new MongoSocket(sendCollection,
                 sendControlCollection,

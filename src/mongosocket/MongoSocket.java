@@ -3,7 +3,7 @@ package mongosocket;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import org.bson.Document;
-
+import org.bson.types.Binary;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -120,7 +120,7 @@ public class MongoSocket {
                     return 0;
                 }
 
-                if (_currentPayload.length <= _currentPayloadPos) {
+                if (_currentPayload == null || _currentPayload.length <= _currentPayloadPos) {
                     fillPayload();
                 }
 
@@ -154,7 +154,7 @@ public class MongoSocket {
                 _serverSequenceNum++;
 
                 _currentPayloadPos = 0;
-                _currentPayload = (byte[]) ((Document)d.get("payload")).get("bytes");
+                _currentPayload = ((Binary)((Document)d.get("payload")).get("bytes")).getData();
 
                 _receiveControlCollection.findOneAndUpdate(
                         new Document(),
