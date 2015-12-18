@@ -24,11 +24,11 @@ public class FileClientExample
         long start = System.currentTimeMillis();
         IOUtils.copy(cInStream, outStream);
         outStream.close();
-        long end = System.currentTimeMillis();
+        long timeTaken = System.currentTimeMillis() - start;
 
         System.out.println(String.format("Transferred %s bytes in %s ms (%.2f MB/sec)",
             cInStream.getByteCount(),
-            (System.currentTimeMillis() - start),
-            ((double)cInStream.getByteCount() / 1000 / 1000) / ((end - start) / 1000L)));
+            timeTaken,
+            ((double)cInStream.getByteCount() / 1000 / 1000) / (timeTaken / 1000L)));
     }
 }
