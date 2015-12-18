@@ -13,7 +13,7 @@ public class MongoFileInputStream extends InputStream {
     InputStream _stream;
 
     public MongoFileInputStream(MongoSocketClient pClient, String pFile) throws MongoSocketConnectFailedException, IOException {
-        MongoSocket socket = pClient.connect(5);
+        MongoSocket socket = pClient.connect(5, 5);
         OutputStream s = socket.getOutputStream();
         try {
             s.write(pFile.getBytes());

@@ -11,6 +11,7 @@ public class MongoFileServer {
 
     public MongoFileServer(MongoSocketServer pServer, File pDirectory) {
         pServer.setCallback(new Callback(pDirectory));
+        pServer.start();
     }
 
     private class Callback implements  MongoSocketServerConnectCallback {
@@ -47,7 +48,7 @@ public class MongoFileServer {
 
             while (true) {
                 int read = s.read(buffer);
-                if (read == 0) {
+                if (read == -1) {
                     break;
                 }
 

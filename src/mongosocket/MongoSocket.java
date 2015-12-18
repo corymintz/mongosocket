@@ -4,6 +4,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import org.bson.Document;
 import org.bson.types.Binary;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -12,18 +13,21 @@ public class MongoSocket {
 
     private long _clientSequenceNum;
     private long _serverSequenceNum;
+    private long _readWriteTimeout;
 
     private MongoCollection<Document> _sendCollection;
     private MongoCursor<Document> _receiveCursor;
     private MongoCollection<Document> _sendControlCollection;
     private MongoCollection<Document> _receiveControlCollection;
 
-    public MongoSocket(MongoCollection<Document> pSendCollection,
+    public MongoSocket(long pReadWriteTimeout,
+                       MongoCollection<Document> pSendCollection,
                        MongoCollection<Document> pSendControlCollection,
                        MongoCursor<Document> pRceieveCursor,
                        MongoCollection<Document> pReceiveControlCollection,
                        long pClientSequenceNumber,
                        long pServerSequenceNumber) {
+        _readWriteTimeout = pReadWriteTimeout;
         _sendCollection = pSendCollection;
         _sendControlCollection = pSendControlCollection;
         _receiveCursor = pRceieveCursor;
@@ -104,6 +108,10 @@ public class MongoSocket {
 
             @Override
             public int read() throws IOException {
+                if (closed) {
+                    throw new IOException("Socket closed");
+                }
+
                 if (_currentPayload.length <= _currentPayloadPos) {
                     fillPayload();
                 }
@@ -112,6 +120,10 @@ public class MongoSocket {
 
             @Override
             public int read(byte[] b, int off, int len) throws IOException {
+                if (closed) {
+                    throw new IOException("Socket closed");
+                }
+
                 if (b == null) {
                     throw new NullPointerException();
                 } else if (off < 0 || len < 0 || len > b.length - off) {
@@ -126,7 +138,8 @@ public class MongoSocket {
 
                 // close received
                 if (_currentPayload == null) {
-                    return 0;
+                    closed = true;
+                    return -1;
                 }
 
                 int bytesToCopy = Math.min(len, _currentPayload.length - _currentPayloadPos);
@@ -136,7 +149,11 @@ public class MongoSocket {
             }
 
             private void fillPayload() throws IOException {
-                Document d = _receiveCursor.next();
+                Document d = MongoSocketUtils.getDocFromTailingCursor(_receiveCursor, _readWriteTimeout);
+                if (d == null) {
+                    throw new IOException("ReadWriteTimeout reached waiting for data");
+                }
+
                 if (d.containsKey("type") == false || d.getString("type").equals(MongoSocketUtils.MessageType.Close.name())) {
                     _currentPayload = null;
                     _currentPayloadPos = 0;

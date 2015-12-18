@@ -13,6 +13,11 @@ public class MongoSocketServer {
     private MongoCollection<Document> _serverConnectCollection;
     private MongoNamespace _namespace;
     private MongoSocketServerConnectCallback _callback;
+    private long _readWriteTimeout;
+
+    public MongoSocketServer(MongoNamespace pNamespace) {
+        this(new MongoClient(), pNamespace);
+    }
 
     public MongoSocketServer(MongoClient pClient, MongoNamespace pNamespace) {
         _client = pClient;
@@ -20,11 +25,14 @@ public class MongoSocketServer {
         _serverConnectCollection = _client
             .getDatabase(pNamespace.getDatabaseName())
             .getCollection(pNamespace.getCollectionName());
+        _readWriteTimeout = 60;
     }
 
     public void setCallback(MongoSocketServerConnectCallback pCallback) {
         _callback = pCallback;
     }
+
+    public void setReadWriteTimeout(long pReadWriteTimeout) { _readWriteTimeout = pReadWriteTimeout; }
 
     public void start() {
         Runnable task = () -> {
@@ -72,9 +80,6 @@ public class MongoSocketServer {
                 receiveNamespace.getDatabaseName(),
                 receiveNamespace.getCollectionName() + "_control");
 
-            MongoCollection<Document> sendCollection = _client
-                    .getDatabase(sendNamespace.getDatabaseName())
-                    .getCollection(sendNamespace.getCollectionName());
             MongoCollection<Document> sendControlCollection = _client
                     .getDatabase(sendControlNamespace.getDatabaseName())
                     .getCollection(sendControlNamespace.getCollectionName());
@@ -146,7 +151,8 @@ public class MongoSocketServer {
                 System.out.println("Failed to send `Ping` to MongoDB server: " + e.getMessage());
             }
 
-            MongoSocket s = new MongoSocket(receiveCollection,
+            MongoSocket s = new MongoSocket(_readWriteTimeout,
+                receiveCollection,
                 receiveControlCollection,
                 sendCursor,
                 sendControlCollection,

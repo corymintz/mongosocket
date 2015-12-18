@@ -12,6 +12,10 @@ public class MongoSocketClient {
     private MongoClient _client;
     private MongoCollection<Document> _serverConnectCollection;
 
+    public MongoSocketClient(MongoNamespace pNamespace) {
+        this(new MongoClient(), pNamespace);
+    }
+
     public MongoSocketClient(MongoClient pClient, MongoNamespace pNamespace) {
         _client = pClient;
         _serverConnectCollection = _client
@@ -19,13 +23,14 @@ public class MongoSocketClient {
                 .getCollection(pNamespace.getCollectionName());
     }
 
-    public MongoSocket connect(long pConnectTimeout) throws MongoSocketConnectFailedException {
+    public MongoSocket connect(long pConnectTimeout, long pReadWriteTimeout) throws MongoSocketConnectFailedException {
         long clientSequenceNum = 0;
         long serverSequenceNum = 0;
         MongoCollection<Document> sendCollection = null;
         MongoCollection<Document> sendControlCollection = null;
         MongoNamespace receiveNamespace = null;
         MongoCollection<Document> receiveControlCollection = null;
+
         MongoCursor<Document> serverHelloCursor = MongoSocketUtils.createTailingCursor(_serverConnectCollection);
 
         // send hello on server namespace where hopefully a server is listening
@@ -132,7 +137,8 @@ public class MongoSocketClient {
         serverSequenceNum++;
 
 
-        return new MongoSocket(sendCollection,
+        return new MongoSocket(pReadWriteTimeout,
+                sendCollection,
                 sendControlCollection,
                 receiveCursor,
                 receiveControlCollection,
