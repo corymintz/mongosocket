@@ -11,6 +11,9 @@ import java.io.OutputStream;
 
 public class MongoSocket {
 
+    public final static int MAX_PAYLOAD_SIZE = 1024 * 256;
+    public final static int MAX_WINDOW_SIZE = 10;
+
     private long _clientSequenceNum;
     private long _serverSequenceNum;
     private long _readWriteTimeout;
@@ -42,8 +45,6 @@ public class MongoSocket {
         }
 
         return new OutputStream() {
-            private int MAX_PAYLOAD_SIZE = 64 * 1024;
-            private int MAX_WINDOW_SIZE = 10;
             private boolean closed;
 
             @Override

@@ -101,7 +101,10 @@ public class MongoSocketServer {
             sendControlCollection.insertOne(new Document("seqNum", 1L));
 
             // start listening on the send namespace
-            MongoCursor<Document> sendCursor = MongoSocketUtils.createTailingCursorAndCollection(_client, sendNamespace, 1024 * 1024);
+            MongoCursor<Document> sendCursor = MongoSocketUtils.createTailingCursorAndCollection(
+                    _client,
+                    sendNamespace,
+                    MongoSocket.MAX_PAYLOAD_SIZE * (MongoSocket.MAX_WINDOW_SIZE + 5));
 
             // send the server hello
             try {
